@@ -1,27 +1,40 @@
-import socket
-import smtplib
-import dns.resolver
+import requests
+import time
 
-try:
-    records = dns.resolver.resolve('leanscale.com', 'MX')
-    mxRecord = records[0].exchange
-    mxRecord = str(mxRecord)
-    print(mxRecord)
+API_KEY = ""
 
-    host = socket.gethostname()
-    server = smtplib.SMTP_SSL(mxRecord, port=465, timeout=10)
-    server.set_debuglevel(1)
-    server.connect(mxRecord)
-    server.helo(host)
-    server.mail('me@domain.com')
-    code, message = server.rcpt(str("eren.cavus@leanscale.com"))
-    server.quit()
+def generate_email_combinations(first_name, last_name, domain):
+    patterns = [
+        '{first}@{domain}',
+        '{first}.{last}@{domain}',
+        '{first}{last}@{domain}',
+        '{f}.{last}@{domain}',
+        '{f}{last}@{domain}',
+        '{last}.{first}@{domain}',
+        '{first}_{last}@{domain}',
+        '{last}@{domain}',
+    ]
+    first = first_name.lower()
+    last = last_name.lower()
+    f = first[0]
+    for pattern in patterns:
+        yield pattern.format(first=first, last=last, f=f, domain=domain)
 
-    print(code)
-    print(message)
-    if code == 250:
-        print('Success')
+valid_emails = []
+for email in generate_email_combinations("eren", "cavus", "leanscale.com"):
+    response = requests.get(f"https://emailvalidation.abstractapi.com/v1/?api_key={API_KEY}&email={email}")
+    time.sleep(1)
+    
+    if response.status_code == 200:
+        data = response.json()
+        if data.get("deliverability") == "DELIVERABLE" and data.get("is_valid_format", {}).get("value"):
+            print(f"Valid email found: {email}")
+            valid_emails.append(email)
+        else:
+            print(f"Invalid email: {email}")
     else:
-        print('Bad')
-except Exception as e:
-    print(f"Error verifying: {e}")
+        print(f"Error validating email {email}: {response.status_code}")
+
+print("\nValid emails:")
+for email in valid_emails:
+    print(email)
